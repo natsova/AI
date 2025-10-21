@@ -279,7 +279,7 @@ def replace_deleted_images(config: Config, recursion_level=0):
         current_count = len(list(category_path.glob("*.jpg")))
         if current_count < config.images_per_category:
             print(f"{category}: Still under target ({current_count}/{config.images_per_category}). Retrying...")
-            replace_deleted_images(recursion_level + 1)
+            replace_deleted_images(config, recursion_level + 1)
         else:
             print(f"{category}: Now has {current_count} images.\n")
 
