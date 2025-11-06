@@ -1,4 +1,28 @@
-# Download and trim YouTube videos, and extract audio as wav files.
+"""
+Program: YouTube Audio Snippet Downloader  
+Author: Natalie Sova  
+Description:  
+    This script automates downloading, trimming, and audio extraction from YouTube videos.  
+    It supports both standard and Shorts URLs, converts them to a uniform format, downloads  
+    specified time segments, and saves the resulting audio as WAV files organised by category.  
+
+Features:  
+    - Converts YouTube Shorts URLs to standard watch URLs  
+    - Downloads videos using yt_dlp  
+    - Trims clips to specified start and duration times using ffmpeg  
+    - Extracts and saves audio as .wav files in structured directories  
+    - Cleans up temporary files automatically  
+
+Dependencies:  
+    - yt_dlp  
+    - ffmpeg  
+    - Python 3.8+  
+
+Usage:  
+    1. Edit the `categories` dictionary with labels, URLs, start times, and durations.  
+    2. Run the script to automatically download and save audio snippets.  
+"""
+
 import os
 import yt_dlp
 import subprocess
