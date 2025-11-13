@@ -119,6 +119,7 @@ def download_images(config: Config):
                         try:
                             with Image.open(img_file) as img:
                                 img = img.convert("RGB")
+                                img = img.resize((400,400), Image.LANCZOS)
                                 save_path = category_path / f"{image_counter}.jpg"
                                 img.save(save_path, "JPEG")
                                 image_counter += 1
@@ -140,6 +141,126 @@ def download_images(config: Config):
 
         print(f"{category} done: {image_counter - 1} images downloaded.")
 
+def randomise_query(base):
+    modifiers = [
+        "high quality", "hdr", "aesthetic", "macro", "film", "close up",
+        "dawn", "dusk", "natural light", "4k"
+    ]
+    return f"{base} {random.choice(modifiers)}"
+
+def download_images_for_category(category, config, image_counter, needed=None):
+    """Downloads and processes images for a single category."""
+    category_path = config.dataset_path / category
+    category_path.mkdir(parents=True, exist_ok=True)
+
+    queries = [
+        f"{category} photo",
+        f"{category} sun photo",
+        f"{category} night photo"
+    ]
+
+    temp_dir = category_path / "temp_download"
+    images_added = 0
+    needed = needed or config.images_per_category
+
+    for query in queries:
+        if image_counter > config.images_per_category or images_added >= needed:
+            break
+
+        print(f"Downloading: {query}")
+
+        try:
+            # Download multiple randomized versions of the same query
+            for _ in range(3):
+                randomized_query = randomise_query(f"{category} photo")
+                print(f"Query: {randomized_query}")
+                downloader.download(
+                    randomized_query,
+                    limit=config.images_per_search,
+                    output_dir=str(temp_dir),
+                    adult_filter_off=True,
+                    force_replace=False,
+                    timeout=60,
+                    verbose=False
+                )
+                time.sleep(config.sleep_time)
+
+                query_folder = temp_dir / randomized_query
+                if not query_folder.exists():
+                    continue
+
+                for img_file in query_folder.glob("*.*"):
+                    if image_counter > config.images_per_category or images_added >= needed:
+                        break
+                    try:
+                        with Image.open(img_file) as img:
+                            img = img.convert("RGB")
+                            img = img.resize((400, 400), Image.LANCZOS)
+                            save_path = category_path / f"{image_counter}.jpg"
+                            img.save(save_path, "JPEG")
+                            image_counter += 1
+                            images_added += 1
+                    except Exception as e:
+                        print(f"Skipped invalid: {img_file.name} ({e})")
+
+                shutil.rmtree(query_folder, ignore_errors=True)
+
+            # Clean up empty temp folder
+            if temp_dir.exists() and not any(temp_dir.iterdir()):
+                temp_dir.rmdir()
+
+        except Exception as e:
+            print(f"Error during download for '{query}': {e}")
+            continue
+
+    return image_counter, images_added
+
+def download_images(config):
+    """Initial dataset population."""
+    for category in config.categories:
+        print(f"\nProcessing category: {category}")
+        image_counter = 1
+
+        image_counter, _ = download_images_for_category(category, config, image_counter)
+
+        remove_duplicate_images(config)
+        print(f"{category} done: {image_counter - 1} images downloaded.")
+
+def replace_deleted_images(config, recursion_level: int = 0, max_recursion_depth: int = 10):
+    """Recursively refill missing images in categories."""
+    if recursion_level > max_recursion_depth:
+        print("Max recursion depth reached — stopping to avoid infinite loop.")
+        return
+
+    for category in config.categories:
+        category_path = config.dataset_path / category
+        category_path.mkdir(exist_ok=True)
+
+        existing_images = list(category_path.glob("*.jpg"))
+        count_existing = len(existing_images)
+        needed = config.images_per_category - count_existing
+
+        if needed <= 0:
+            print(f"{category}: already has {count_existing} images.")
+            continue
+
+        print(f"\n{category}: {count_existing} found, need {needed} more.")
+        image_counter = count_existing + 1
+
+        image_counter, added = download_images_for_category(category, config, image_counter, needed)
+
+        remove_duplicate_images(config)
+
+        current_count = len(list(category_path.glob("*.jpg")))
+        if current_count < config.images_per_category:
+            print(f"{category}: Still under target ({current_count}/{config.images_per_category}). Retrying...")
+            replace_deleted_images(config, recursion_level + 1)
+        else:
+            print(f"{category}: Now has {current_count} images.\n")
+
+    if recursion_level == 0:
+        print("Replacement process complete!")
+
 # Function: Remove duplicates
 
 def remove_duplicate_images(config: Config):
@@ -159,7 +280,7 @@ def remove_duplicate_images(config: Config):
 # Function: Display 5 random images per category
 
 def display_images(config: Config):
-  config.dataset_path = Path("dataset")
+  config.dataset_path = Path("datasets")
 
   for category in config.categories:
       category_path = config.dataset_path / category
@@ -181,117 +302,12 @@ def display_images(config: Config):
           plt.title(f"{img_path.name}")
       plt.show()
 
-# Function: Preprocess images - convert to RGBA, resize, then convert to RGB
-
-def convert_RGBA_RGB(config: Config):
-    for img_path in config.dataset_path.rglob("*.*"):
-        im = Image.open(img_path)
-        if im.mode != "RGBA":
-            im.convert("RGBA").save(img_path)
-
-    resize_images(config.dataset_path, max_size=400, dest=config.dataset_path, recurse=True)
-
-    for img_path in config.dataset_path.rglob("*.*"):
-        im = Image.open(img_path)
-        if im.mode != "RGB":
-            im.convert("RGB").save(img_path)
-
-# Function: Replace deleted or missing images (recursive)
-
-max_recursion_depth = 10
-count_existing = 0
-needed = config.images_per_category
-
-def replace_deleted_images(config: Config, recursion_level=0):
-
-    if recursion_level > max_recursion_depth:
-        print("Max recursion depth reached — stopping to avoid infinite loop.")
-        return
-
-    for category in config.categories:
-        category_path = config.dataset_path / category
-        category_path.mkdir(exist_ok=True)
-
-        existing_images = list(category_path.glob("*.jpg"))
-        count_existing = len(existing_images)
-        needed = config.images_per_category - count_existing
-
-        if needed <= 0:
-            print(f"{category}: already has {count_existing} images.")
-            continue
-
-        print(f"\n{category}: {count_existing} found, need {needed} more.")
-        image_counter = count_existing + 1
-
-        queries = [
-            f"{category} photo",
-            f"{category} sun photo",
-            f"{category} night photo"
-        ]
-
-        for query in queries:
-            if needed <= 0:
-                break
-
-            print(f"Downloading replacements for {category}: '{query}'")
-            temp_dir = category_path / "temp_download"
-            try:
-                downloader.download(
-                    query,
-                    limit=config.images_per_search,
-                    output_dir=str(temp_dir),
-                    adult_filter_off=True,
-                    force_replace=False,
-                    timeout=60,
-                    verbose=False
-            )
-            except Exception as e:
-                print(f"Error during download for '{query}': {e}")
-                continue
-
-            time.sleep(config.sleep_time)
-
-            query_folder = temp_dir / query
-            if query_folder.exists():
-                for img_file in query_folder.glob("*.*"):
-                    if needed <= 0:
-                        break
-                    try:
-                        with Image.open(img_file) as img:
-                            #img.verify()  # check if valid
-                            #img = Image.open(img_file).convert("RGB")
-                            save_path = category_path / f"{image_counter}.jpg"
-                            img.save(save_path, "JPEG")
-                            image_counter += 1
-                            needed -= 1
-                    except Exception as e:
-                        print(f"Skipped invalid: {img_file.name} ({e})")
-
-                shutil.rmtree(query_folder, ignore_errors=True)
-
-            if temp_dir.exists() and not any(temp_dir.iterdir()):
-                temp_dir.rmdir()
-
-        # Cleanup duplicates after refill
-        remove_duplicate_images(config)
-
-        # Re-check total count
-        current_count = len(list(category_path.glob("*.jpg")))
-        if current_count < config.images_per_category:
-            print(f"{category}: Still under target ({current_count}/{config.images_per_category}). Retrying...")
-            replace_deleted_images(config, recursion_level + 1)
-        else:
-            print(f"{category}: Now has {current_count} images.\n")
-
-    if recursion_level == 0:
-        print("Replacement process complete!")
-
 #  Function: Select invalid images for deletion
 
 checkboxes = {}
 
 def select_img_for_deletion(config: Config):
-  config.dataset_path = Path("dataset")
+  config.dataset_path = Path("datasets")
   images_to_discard = []
 
   for category in config.categories:
