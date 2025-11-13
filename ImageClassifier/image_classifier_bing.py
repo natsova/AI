@@ -1,11 +1,10 @@
 '''
 image_classifier_bing.py 
 
-Version: This version addresses point 1 of the code review located at natsova/Programming/CodeReview/image_classifier_bing
-and incorporates a Config class.
+Version: This version addresses points 3, 4 and 5 of the code review located at natsova/Programming/CodeReview/image_classifier_bing
 
 Automates dataset creation for image classification using Bing image search.  
-Downloads, organizes, deduplicates, and validates images across predefined categories.  
+Downloads, organises, deduplicates, and validates images across predefined categories.  
 Includes tools for visual review, selective deletion, and replacement of missing or corrupted images.  
 Integrates fastai utilities for verification and Pillow for format conversions.  
 Colab version: https://colab.research.google.com/drive/15SlbLCHlO7t5kd95vTeOOmmCIhzHKTH6
@@ -36,6 +35,7 @@ import hashlib
 import random
 from dataclasses import dataclass
 from typing import List
+import socket
 
 # ========================= Config class =========================
 
@@ -73,6 +73,8 @@ def create_folders_for_categories(config: Config):
 
 # Function: Download images
 
+socket.setdefaulttimeout(15)    # Set a global default network timeout (in seconds)
+
 def randomise_query(base):
     modifiers = [
         "high quality", "hdr", "aesthetic", "macro", "film", "close up",
@@ -81,6 +83,7 @@ def randomise_query(base):
     return f"{base} {random.choice(modifiers)}"
 
 def download_images(config: Config):
+    # Downloads, converts to RGB, resizes, and saves images into each category.
 
     for category in config.categories:
         category_path = config.dataset_path / category
@@ -94,39 +97,53 @@ def download_images(config: Config):
 
             print(f"Downloading: {query}")
             temp_dir = category_path / "temp_download"
+            temp_dir.mkdir(parents=True, exist_ok=True)
 
             try:
                 for _ in range(3):
                     query = randomise_query(f"{category} photo")
                     print(f"Downloading: {query}")
-                    downloader.download(
-                        query,
-                        limit=config.images_per_search,
-                        output_dir=str(temp_dir),
-                        adult_filter_off=True,
-                        force_replace=False, # "True" has a bug - AttributeError: type object 'Path' has no attribute 'isdir'
-                        timeout=60,
-                        verbose=False
-                    )
+
+                    try:
+                    # Enforce timeout at both socket and downloader level
+                        downloader.download(
+                            query,
+                            limit=config.images_per_search,
+                            output_dir=str(temp_dir),
+                            adult_filter_off=True,
+                            force_replace=False, # "True" has a bug - AttributeError: type object 'Path' has no attribute 'isdir'
+                            timeout=30,
+                            verbose=False
+                        )
+                    except (TimeoutError, socket.timeout) as e:
+                        print(f"Timeout while downloading '{query}': {e}")
+                        continue
+                    except Exception as e:
+                        print(f"Network error during '{query}': {e}")
+                        continue
+
                     time.sleep(config.sleep_time)
 
-                # Move images from temp folder to main category folder
+                # Process images and move from temp folder to category folder
                 query_folder = temp_dir / query
-                if query_folder.exists():
-                    for img_file in query_folder.glob("*.*"):
-                        if image_counter > config.images_per_category:
-                            break
-                        try:
-                            with Image.open(img_file) as img:
-                                img = img.convert("RGB")
-                                img = img.resize((400,400), Image.LANCZOS)
-                                save_path = category_path / f"{image_counter}.jpg"
-                                img.save(save_path, "JPEG")
-                                image_counter += 1
-                        except Exception as e:
-                            print(f"Skipped invalid: {img_file.name} ({e})")
+                if not query_folder.exists():
+                    print(f"No folder found for '{query}', skipping.")
+                    continue
 
-                    shutil.rmtree(query_folder)
+                for img_file in query_folder.glob("*.*"):
+                    if image_counter > config.images_per_category:
+                        break
+                    try:
+                        with Image.open(img_file) as img:
+                            img = img.convert("RGB")
+                            img = img.resize((400,400), Image.LANCZOS)
+                            save_path = category_path / f"{image_counter}.jpg"
+                            img.save(save_path, "JPEG")
+                            image_counter += 1
+                    except Exception as e:
+                        print(f"Skipped invalid: {img_file.name} ({e})")
+
+                shutil.rmtree(query_folder)
 
                 # Remove temp folder if empty
                 if temp_dir.exists() and not any(temp_dir.iterdir()):
@@ -138,18 +155,10 @@ def download_images(config: Config):
 
         # Remove duplicates
         remove_duplicate_images(config)
-
         print(f"{category} done: {image_counter - 1} images downloaded.")
 
-def randomise_query(base):
-    modifiers = [
-        "high quality", "hdr", "aesthetic", "macro", "film", "close up",
-        "dawn", "dusk", "natural light", "4k"
-    ]
-    return f"{base} {random.choice(modifiers)}"
-
 def download_images_for_category(category, config, image_counter, needed=None):
-    """Downloads and processes images for a single category."""
+    # Downloads and processes images for a single category.
     category_path = config.dataset_path / category
     category_path.mkdir(parents=True, exist_ok=True)
 
@@ -170,7 +179,7 @@ def download_images_for_category(category, config, image_counter, needed=None):
         print(f"Downloading: {query}")
 
         try:
-            # Download multiple randomized versions of the same query
+            # Download multiple randomised versions of the same query
             for _ in range(3):
                 randomized_query = randomise_query(f"{category} photo")
                 print(f"Query: {randomized_query}")
