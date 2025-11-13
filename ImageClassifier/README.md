@@ -25,6 +25,61 @@ Improvement:
   * Wrap everything inside a class or use a configuration dataclass.
   * Dependency-inject configuration instead of using globals.
 
+### Solution:
+
+```python
+# ========================= Imports =========================
+
+from pathlib import Path
+import shutil
+from dataclasses import dataclass
+from typing import List
+
+# ========================= Config class =========================
+
+@dataclass
+class Config:
+    dataset_path: Path
+    categories: List[str]
+
+# Config instance
+config = Config(
+    dataset_path=Path("datasets"),
+    categories=["sky", "beach", "umbrella", "dog", "book"]
+)
+
+def create_folders_for_categories(config: Config):
+    if config.dataset_path.exists() and config.dataset_path.is_dir(): # Clear existing dataset
+        shutil.rmtree(config.dataset_path)
+        print("Dataset folder cleared!")
+
+    config.dataset_path.mkdir(exist_ok=True)
+
+    for category in config.categories: # Create category folders
+        (config.dataset_path / category).mkdir(exist_ok=True)
+        print("Created", config.dataset_path, "/", category)
+
+
+# ========================= DatasetManager class =========================
+
+class DatasetManager:
+    def __init__(self, config: Config):
+        self.config = config
+
+    def setup(self):
+        create_folders_for_categories(self.config)
+
+
+# ========================= Main entry point =========================
+
+def main():
+    manager = DatasetManager(config)
+    manager.setup()
+
+if __name__ == "__main__":
+    main()
+```
+
 ## 2. Directory Handling in Downloads
 
 Problem: downloader.download() creates its own folders inside output_dir. You’re hardcoding 
