@@ -1,8 +1,6 @@
 '''
 image_classifier_bing.py 
 
-Version: This version addresses points 3, 4 and 5 of the code review located at natsova/Programming/CodeReview/image_classifier_bing
-
 Automates dataset creation for image classification using Bing image search.  
 Downloads, organises, deduplicates, and validates images across predefined categories.  
 Includes tools for visual review, selective deletion, and replacement of missing or corrupted images.  
@@ -58,8 +56,9 @@ config = Config(
     remove_duplicates = True
 )
 
-# Function: Create folder for config.categories
-
+'''
+Creates folders for categories.
+'''
 def create_folders_for_categories(config: Config):
     if config.dataset_path.exists() and config.dataset_path.is_dir(): # Clear existing dataset
         shutil.rmtree(config.dataset_path)
@@ -71,6 +70,10 @@ def create_folders_for_categories(config: Config):
         (config.dataset_path / category).mkdir(exist_ok=True)
         print("Created", config.dataset_path, "/", category)
 
+
+''' 
+Returns the base query string with one randomly selected visual-quality modifier appended.
+'''
 def randomise_query(base: str) -> str:
     modifiers = [
         "high quality", "hdr", "aesthetic", "macro", "film", "close up",
@@ -78,14 +81,24 @@ def randomise_query(base: str) -> str:
     ]
     return f"{base} {random.choice(modifiers)}"
 
+
+'''
+Main dataset download controller. Iterates through each category in the config and downloads all 
+images for that category while tracking progress.
+'''
 def download_images(config):
-    # Main dataset download controller.
+    
     for category in config.categories:
         print(f"\nProcessing category: {category}")
         image_counter = 1
         image_counter, _ = download_images_for_category(category, config, image_counter)
         print(f"{category} done: {image_counter - 1} images downloaded.")
 
+
+''' 
+Downloads, validates, resizes, and saves images for a single category while 
+handling errors, duplicates, and corrupted files.
+'''
 def download_images_for_category(category, config, image_counter, needed=None):
     # Handles downloading, validating, and saving images for one category.
     category_path = config.dataset_path / category
@@ -166,6 +179,12 @@ def download_images_for_category(category, config, image_counter, needed=None):
 
     return image_counter, images_added
 
+
+''' 
+Repeatedly checks each category and downloads additional images as needed until all 
+categories reach the target count or the maximum number of rounds is reached, while 
+removing corrupted and duplicate files.
+'''
 def refill_categories(config, max_rounds=5):
     for round_idx in range(max_rounds):
         print(f"\n--- Round {round_idx+1}/{max_rounds} ---")
@@ -207,8 +226,11 @@ def refill_categories(config, max_rounds=5):
 
     print("\nStopped after max rounds. Some categories may still be short.")
 
-# Function: Remove duplicates
 
+'''
+Scans each category and deletes any images that have identical content by comparing 
+MD5 hashes.
+'''
 def remove_duplicate_images(config: Config):
   if config.remove_duplicates:
       for category in config.categories:
@@ -223,8 +245,11 @@ def remove_duplicate_images(config: Config):
               else:
                   hashes[file_hash] = img_path
 
-# Function: Display 5 random images per category
 
+'''
+Randomly selects up to 5 images per category and displays them in a row with their 
+filenames, and warning if no images are found.
+'''
 def display_images(config: Config):
   config.dataset_path = Path("datasets")
 
@@ -251,6 +276,11 @@ def display_images(config: Config):
 # global mapping: str(path) -> Checkbox widget
 checkboxes = {}
 
+
+'''
+Displays thumbnails of all images per category with checkboxes, allowing the user 
+to mark which images to keep or delete interactively.
+'''
 def select_img_for_deletion(config):
    # Populate global checkboxes mapping with widgets for manual review.
     global checkboxes
@@ -293,6 +323,11 @@ def select_img_for_deletion(config):
 
     print("\nUncheck images to delete, then run delete_unchecked_images().")
 
+
+'''
+Deletes all images whose checkboxes were unchecked in the UI, reporting successes and failures, 
+and optionally clears the display and checkbox mapping.
+'''
 def delete_unchecked_images(clear_ui: bool = True):
     # Delete images that have been unchecked in the UI.
 
@@ -323,8 +358,10 @@ def delete_unchecked_images(clear_ui: bool = True):
         # Keep checkboxes empty to avoid accidental repeats
         checkboxes.clear()
 
-# Function: Remove corrupted images from dataset
 
+'''
+Verifies all images in the dataset and deletes any that are corrupted, reporting the number removed.
+'''
 def remove_corrupted_images(config: Config):
     failed = verify_images(get_image_files(config.dataset_path))
     failed.map(Path.unlink)
