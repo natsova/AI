@@ -72,17 +72,6 @@ def create_folders_for_categories(config: Config):
         print("Created", config.dataset_path, "/", category)
 
 
-''' 
-Returns the base query string with one randomly selected visual-quality modifier appended.
-'''
-def randomise_query(base: str) -> str:
-    modifiers = [
-        "high quality", "hdr", "aesthetic", "macro", "film", "close up",
-        "dawn", "dusk", "natural light", "4k"
-    ]
-    return f"{base} {random.choice(modifiers)}"
-
-
 '''
 Main dataset download controller. Iterates through each category in the config and downloads all 
 images for that category while tracking progress.
@@ -94,6 +83,17 @@ def download_images(config):
         image_counter = 1
         image_counter, _ = download_images_for_category(category, config, image_counter)
         print(f"{category} done: {image_counter - 1} images downloaded.")
+
+
+''' 
+Returns the base query string with one randomly selected visual-quality modifier appended.
+'''
+def randomise_query(base: str) -> str:
+    modifiers = [
+        "high quality", "hdr", "aesthetic", "macro", "film", "close up",
+        "dawn", "dusk", "natural light", "4k"
+    ]
+    return f"{base} {random.choice(modifiers)}"
 
 
 ''' 
