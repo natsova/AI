@@ -77,7 +77,6 @@ Main dataset download controller. Iterates through each category in the config a
 images for that category while tracking progress.
 '''
 def download_images(config):
-    
     for category in config.categories:
         print(f"\nProcessing category: {category}")
         image_counter = 1
@@ -101,7 +100,6 @@ Downloads, validates, resizes, and saves images for a single category while
 handling errors, duplicates, and corrupted files.
 '''
 def download_images_for_category(category, config, image_counter, needed=None):
-    # Handles downloading, validating, and saving images for one category.
     category_path = config.dataset_path / category
     category_path.mkdir(parents=True, exist_ok=True)
 
@@ -283,7 +281,6 @@ Displays thumbnails of all images per category with checkboxes, allowing the use
 to mark which images to keep or delete interactively.
 '''
 def select_img_for_deletion(config):
-   # Populate global checkboxes mapping with widgets for manual review.
     global checkboxes
     checkboxes.clear()
 
@@ -330,8 +327,6 @@ Deletes all images whose checkboxes were unchecked in the UI, reporting successe
 and optionally clears the display and checkbox mapping.
 '''
 def delete_unchecked_images(clear_ui: bool = True):
-    # Delete images that have been unchecked in the UI.
-
     global checkboxes
     if not checkboxes:
         print("No checkboxes found.")
