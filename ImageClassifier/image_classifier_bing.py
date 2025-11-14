@@ -19,23 +19,23 @@ Author: Natalie Sova, 2025
 !pip install ipywidgets --quiet
 !pip install pillow --quiet
 
-from pathlib import Path
-import shutil
-from PIL import Image
 import os
-from bing_image_downloader import downloader
-import time
-from fastai.vision.all import *
-import matplotlib.pyplot as plt
-import random
-from IPython.display import display
-import ipywidgets as widgets
 import io
 import hashlib
 import random
+import shutil
+import time
+from PIL import Image
+from pathlib import Path
+from bing_image_downloader import downloader
+from fastai.vision.all import *
+import matplotlib.pyplot as plt
+from IPython.display import display, clear_output
+import ipywidgets as widgets
 from dataclasses import dataclass
 from typing import List
 import socket
+import uuid
 
 # ========================= Config class =========================
 
@@ -71,96 +71,28 @@ def create_folders_for_categories(config: Config):
         (config.dataset_path / category).mkdir(exist_ok=True)
         print("Created", config.dataset_path, "/", category)
 
-# Function: Download images
-
-socket.setdefaulttimeout(15)    # Set a global default network timeout (in seconds)
-
-def randomise_query(base):
+def randomise_query(base: str) -> str:
     modifiers = [
         "high quality", "hdr", "aesthetic", "macro", "film", "close up",
         "dawn", "dusk", "natural light", "4k"
     ]
     return f"{base} {random.choice(modifiers)}"
 
-def download_images(config: Config):
-    # Downloads, converts to RGB, resizes, and saves images into each category.
-
+def download_images(config):
+    # Main dataset download controller.
     for category in config.categories:
-        category_path = config.dataset_path / category
-        queries = [f"{category} photo", f"{category} sun photo", f"{category} night photo"]
-
+        print(f"\nProcessing category: {category}")
         image_counter = 1
-
-        for query in queries:
-            if image_counter > config.images_per_category:
-                break
-
-            print(f"Downloading: {query}")
-            temp_dir = category_path / "temp_download"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-
-            try:
-                for _ in range(3):
-                    query = randomise_query(f"{category} photo")
-                    print(f"Downloading: {query}")
-
-                    try:
-                    # Enforce timeout at both socket and downloader level
-                        downloader.download(
-                            query,
-                            limit=config.images_per_search,
-                            output_dir=str(temp_dir),
-                            adult_filter_off=True,
-                            force_replace=False, # "True" has a bug - AttributeError: type object 'Path' has no attribute 'isdir'
-                            timeout=30,
-                            verbose=False
-                        )
-                    except (TimeoutError, socket.timeout) as e:
-                        print(f"Timeout while downloading '{query}': {e}")
-                        continue
-                    except Exception as e:
-                        print(f"Network error during '{query}': {e}")
-                        continue
-
-                    time.sleep(config.sleep_time)
-
-                # Process images and move from temp folder to category folder
-                query_folder = temp_dir / query
-                if not query_folder.exists():
-                    print(f"No folder found for '{query}', skipping.")
-                    continue
-
-                for img_file in query_folder.glob("*.*"):
-                    if image_counter > config.images_per_category:
-                        break
-                    try:
-                        with Image.open(img_file) as img:
-                            img = img.convert("RGB")
-                            img = img.resize((400,400), Image.LANCZOS)
-                            save_path = category_path / f"{image_counter}.jpg"
-                            img.save(save_path, "JPEG")
-                            image_counter += 1
-                    except Exception as e:
-                        print(f"Skipped invalid: {img_file.name} ({e})")
-
-                shutil.rmtree(query_folder)
-
-                # Remove temp folder if empty
-                if temp_dir.exists() and not any(temp_dir.iterdir()):
-                    temp_dir.rmdir()
-
-            except Exception as e:
-                print(f"An unexpected error occurred during download for '{query}': {e}")
-                continue
-
-        # Remove duplicates
-        remove_duplicate_images(config)
+        image_counter, _ = download_images_for_category(category, config, image_counter)
         print(f"{category} done: {image_counter - 1} images downloaded.")
 
 def download_images_for_category(category, config, image_counter, needed=None):
-    # Downloads and processes images for a single category.
+    # Handles downloading, validating, and saving images for one category.
     category_path = config.dataset_path / category
     category_path.mkdir(parents=True, exist_ok=True)
+
+    temp_dir = category_path / "temp_download"
+    temp_dir.mkdir(parents=True, exist_ok=True)
 
     queries = [
         f"{category} photo",
@@ -168,7 +100,6 @@ def download_images_for_category(category, config, image_counter, needed=None):
         f"{category} night photo"
     ]
 
-    temp_dir = category_path / "temp_download"
     images_added = 0
     needed = needed or config.images_per_category
 
@@ -179,23 +110,32 @@ def download_images_for_category(category, config, image_counter, needed=None):
         print(f"Downloading: {query}")
 
         try:
-            # Download multiple randomised versions of the same query
             for _ in range(3):
-                randomized_query = randomise_query(f"{category} photo")
-                print(f"Query: {randomized_query}")
-                downloader.download(
-                    randomized_query,
-                    limit=config.images_per_search,
-                    output_dir=str(temp_dir),
-                    adult_filter_off=True,
-                    force_replace=False,
-                    timeout=60,
-                    verbose=False
-                )
+                randomised_query = randomise_query(f"{category} photo")
+                print(f"Query: {randomised_query}")
+
+                try:
+                    downloader.download(
+                        randomised_query,
+                        limit=config.images_per_search,
+                        output_dir=str(temp_dir),
+                        adult_filter_off=True,
+                        force_replace=False,  # safer setting due to Path bug
+                        timeout=30,
+                        verbose=False
+                    )
+                except (TimeoutError, socket.timeout) as e:
+                    print(f"Timeout while downloading '{randomised_query}': {e}")
+                    continue
+                except Exception as e:
+                    print(f"Network error during '{randomised_query}': {e}")
+                    continue
+
                 time.sleep(config.sleep_time)
 
-                query_folder = temp_dir / randomized_query
+                query_folder = temp_dir / randomised_query
                 if not query_folder.exists():
+                    print(f"No folder found for '{randomised_query}', skipping.")
                     continue
 
                 for img_file in query_folder.glob("*.*"):
@@ -214,7 +154,6 @@ def download_images_for_category(category, config, image_counter, needed=None):
 
                 shutil.rmtree(query_folder, ignore_errors=True)
 
-            # Clean up empty temp folder
             if temp_dir.exists() and not any(temp_dir.iterdir()):
                 temp_dir.rmdir()
 
@@ -222,53 +161,51 @@ def download_images_for_category(category, config, image_counter, needed=None):
             print(f"Error during download for '{query}': {e}")
             continue
 
+    remove_corrupted_images(config)
+    remove_duplicate_images(config)
+
     return image_counter, images_added
 
-def download_images(config):
-    """Initial dataset population."""
-    for category in config.categories:
-        print(f"\nProcessing category: {category}")
-        image_counter = 1
+def refill_categories(config, max_rounds=5):
+    for round_idx in range(max_rounds):
+        print(f"\n--- Round {round_idx+1}/{max_rounds} ---")
 
-        image_counter, _ = download_images_for_category(category, config, image_counter)
+        categories_filled = True
 
-        remove_duplicate_images(config)
-        print(f"{category} done: {image_counter - 1} images downloaded.")
+        for category in config.categories:
+            category_path = config.dataset_path / category
+            category_path.mkdir(exist_ok=True)
 
-def replace_deleted_images(config, recursion_level: int = 0, max_recursion_depth: int = 10):
-    """Recursively refill missing images in categories."""
-    if recursion_level > max_recursion_depth:
-        print("Max recursion depth reached — stopping to avoid infinite loop.")
-        return
+            existing = list(category_path.glob("*.jpg"))
+            count_existing = len(existing)
+            needed = config.images_per_category - count_existing
 
-    for category in config.categories:
-        category_path = config.dataset_path / category
-        category_path.mkdir(exist_ok=True)
+            if needed <= 0:
+                print(f"{category}: OK ({count_existing}/{config.images_per_category})")
+                continue
 
-        existing_images = list(category_path.glob("*.jpg"))
-        count_existing = len(existing_images)
-        needed = config.images_per_category - count_existing
+            categories_filled = False
+            print(f"{category}: {count_existing} found, need {needed} more")
 
-        if needed <= 0:
-            print(f"{category}: already has {count_existing} images.")
-            continue
+            image_counter = count_existing + 1
+            image_counter, added = download_images_for_category(
+                category,
+                config,
+                image_counter,
+                needed,
+            )
 
-        print(f"\n{category}: {count_existing} found, need {needed} more.")
-        image_counter = count_existing + 1
+            remove_corrupted_images(config)
+            remove_duplicate_images(config)
 
-        image_counter, added = download_images_for_category(category, config, image_counter, needed)
+            new_count = len(list(category_path.glob("*.jpg")))
+            print(f"{category}: now {new_count}/{config.images_per_category}")
 
-        remove_duplicate_images(config)
+        if categories_filled:
+            print("\nAll categories filled.")
+            return
 
-        current_count = len(list(category_path.glob("*.jpg")))
-        if current_count < config.images_per_category:
-            print(f"{category}: Still under target ({current_count}/{config.images_per_category}). Retrying...")
-            replace_deleted_images(config, recursion_level + 1)
-        else:
-            print(f"{category}: Now has {current_count} images.\n")
-
-    if recursion_level == 0:
-        print("Replacement process complete!")
+    print("\nStopped after max rounds. Some categories may still be short.")
 
 # Function: Remove duplicates
 
@@ -311,52 +248,80 @@ def display_images(config: Config):
           plt.title(f"{img_path.name}")
       plt.show()
 
-#  Function: Select invalid images for deletion
-
+# global mapping: str(path) -> Checkbox widget
 checkboxes = {}
 
-def select_img_for_deletion(config: Config):
-  config.dataset_path = Path("datasets")
-  images_to_discard = []
+def select_img_for_deletion(config):
+   # Populate global checkboxes mapping with widgets for manual review.
+    global checkboxes
+    checkboxes.clear()
 
-  for category in config.categories:
-      category_path = config.dataset_path / category
-      all_images = sorted(category_path.glob("*.jpg"))
-      if not all_images:
-          continue
+    dataset_path = Path(config.dataset_path)
+    for category in config.categories:
+        category_path = dataset_path / category
+        if not category_path.exists():
+            print(f"No folder: {category_path}")
+            continue
 
-      print(f"\nCategory: {category}")
-      container = widgets.VBox()  # vertical layout
-      rows = []
+        all_images = sorted([p for p in category_path.glob("*.*") if p.suffix.lower() in (".jpg", ".jpeg", ".png")])
+        if not all_images:
+            print(f"No images in '{category}'")
+            continue
 
-      for img_path in all_images:
-          img = Image.open(img_path).convert("RGB")
-          img.thumbnail((150, 150))
+        print(f"\nCategory: {category}")
+        rows = []
+        for img_path in all_images:
+            try:
+                with Image.open(img_path) as img:
+                    img = img.convert("RGB")
+                    img.thumbnail((150, 150))
+                    bio = io.BytesIO()
+                    img.save(bio, format="JPEG")
+                    bio.seek(0)
+                    img_widget = widgets.Image(value=bio.read(), format='jpeg', width=150, height=150)
+            except Exception as e:
+                print(f"Could not load {img_path.name}: {e}")
+                continue
 
-          bio = io.BytesIO()
-          img.save(bio, format="JPEG")
-          bio.seek(0)
+            cb = widgets.Checkbox(value=True, description=img_path.name)
+            checkboxes[str(img_path)] = cb
+            row = widgets.HBox([img_widget, cb])
+            rows.append(row)
 
-          img_widget = widgets.Image(value=bio.read(), format='jpeg', width=150, height=150)
+        container = widgets.VBox(rows)
+        display(container)
 
-          cb = widgets.Checkbox(value=True, description=img_path.name)
-          checkboxes[img_path] = cb
+    print("\nUncheck images to delete, then run delete_unchecked_images().")
 
-          row = widgets.HBox([img_widget, cb])
-          rows.append(row)
+def delete_unchecked_images(clear_ui: bool = True):
+    # Delete images that have been unchecked in the UI.
 
-      container.children = rows
-      display(container)
+    global checkboxes
+    if not checkboxes:
+        print("No checkboxes found.")
+        return
 
-# Function: Delete unchecked images
+    deleted = 0
+    failed = 0
+    for path_str, cb in list(checkboxes.items()):
+        try:
+            if not cb.value:
+                p = Path(path_str)
+                p.unlink(missing_ok=True)
+                deleted += 1
+                print(f"Deleted: {p}")
+        except Exception as e:
+            failed += 1
+            print(f"Failed to delete {path_str}: {e}")
 
-def delete_unchecked_images():
-    for img_path, cb in checkboxes.items():
-        if not cb.value:  # unchecked = discard
-            img_path.unlink()
-            print(f"Discarded {img_path.name}")
+    print(f"Done. Deleted: {deleted}. Failed: {failed}.")
 
-    print("Cleanup finished!")
+    if clear_ui:
+        # Remove widgets from output so user sees result and UI cleared
+        clear_output(wait=True)
+        print(f"Deleted: {deleted}. Failed: {failed}.")
+        # Keep checkboxes empty to avoid accidental repeats
+        checkboxes.clear()
 
 # Function: Remove corrupted images from dataset
 
@@ -365,38 +330,36 @@ def remove_corrupted_images(config: Config):
     failed.map(Path.unlink)
     print(f"Removed {len(failed)} corrupted images.")
 
-# # ========================= DatasetManager class ========================
+# # ========================= DatasetManager class =========================
 
-class DatasetManager:
-    def __init__(self, config: Config):
-        self.config = config
+# class DatasetManager:
+#     def __init__(self, config: Config):
+#         self.config = config
 
-    def setup(self):
-        create_folders_for_categories(self.config)
-        download_images(self.config)
-        remove_duplicate_images(self.config)
-        select_img_for_deletion(self.config); replace_deleted_images(self.config)
-        display_images(self.config)
+#     def setup(self):
+#         create_folders_for_categories(self.config)
+#         download_images(self.config)
+#         select_img_for_deletion(self.config)
+#         refill_categories(self.config)
+#         display_images(self.config)
 
-# ================== Main entry point - Single workflow ==================
+# ========================= Main entry point - Single workflow =========================
 
-def main():
-    manager = DatasetManager(config)
-    manager.setup()
+# def main():
+#     manager = DatasetManager(config)
+#     manager.setup()
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
 
 
 '''
-For Colab (or Jupyter) it is better to split the code into cells for interactive 
-# notebook control.
+For Colab (or Jupyter) it is better to split the code into cells for interactive notebook control.
 
 create_folders_for_categories(config)
 download_images(config)
-display_images(config)
 select_img_for_deletion(config)
 delete_unchecked_images()
-replace_deleted_images(config)
+refill_categories(config)
 display_images(config)
 '''
