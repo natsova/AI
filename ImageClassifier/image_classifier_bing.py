@@ -56,6 +56,7 @@ config = Config(
     remove_duplicates = True
 )
 
+
 '''
 Creates folders for categories.
 '''
@@ -366,6 +367,7 @@ def remove_corrupted_images(config: Config):
     failed = verify_images(get_image_files(config.dataset_path))
     failed.map(Path.unlink)
     print(f"Removed {len(failed)} corrupted images.")
+
 
 # # ========================= DatasetManager class =========================
 
