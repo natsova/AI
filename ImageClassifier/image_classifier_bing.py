@@ -17,19 +17,19 @@ Author: Natalie Sova, 2025
 !pip install ipywidgets --quiet
 !pip install pillow --quiet
 
-import os
-import io
-import hashlib
-import random
-import shutil
-import time
-from PIL import Image
 from pathlib import Path
+import shutil
+from PIL import Image
+import os
 from bing_image_downloader import downloader
+import time
 from fastai.vision.all import *
 import matplotlib.pyplot as plt
 from IPython.display import display, clear_output
 import ipywidgets as widgets
+import io
+import hashlib
+import random
 from dataclasses import dataclass
 from typing import List
 import socket
@@ -56,10 +56,6 @@ config = Config(
     remove_duplicates = True
 )
 
-
-'''
-Creates folders for categories.
-'''
 def create_folders_for_categories(config: Config):
     if config.dataset_path.exists() and config.dataset_path.is_dir(): # Clear existing dataset
         shutil.rmtree(config.dataset_path)
@@ -71,11 +67,7 @@ def create_folders_for_categories(config: Config):
         (config.dataset_path / category).mkdir(exist_ok=True)
         print("Created", config.dataset_path, "/", category)
 
-
-'''
-Main dataset download controller. Iterates through each category in the config and downloads all 
-images for that category while tracking progress.
-'''
+# Main dataset download controller.
 def download_images(config):
     for category in config.categories:
         print(f"\nProcessing category: {category}")
@@ -83,10 +75,6 @@ def download_images(config):
         image_counter, _ = download_images_for_category(category, config, image_counter)
         print(f"{category} done: {image_counter - 1} images downloaded.")
 
-
-''' 
-Returns the base query string with one randomly selected visual-quality modifier appended.
-'''
 def randomise_query(base: str) -> str:
     modifiers = [
         "high quality", "hdr", "aesthetic", "macro", "film", "close up",
@@ -94,12 +82,8 @@ def randomise_query(base: str) -> str:
     ]
     return f"{base} {random.choice(modifiers)}"
 
-
-''' 
-Downloads, validates, resizes, and saves images for a single category while 
-handling errors, duplicates, and corrupted files.
-'''
 def download_images_for_category(category, config, image_counter, needed=None):
+    # Handles downloading, validating, and saving images for one category.
     category_path = config.dataset_path / category
     category_path.mkdir(parents=True, exist_ok=True)
 
@@ -178,12 +162,6 @@ def download_images_for_category(category, config, image_counter, needed=None):
 
     return image_counter, images_added
 
-
-''' 
-Repeatedly checks each category and downloads additional images as needed until all 
-categories reach the target count or the maximum number of rounds is reached, while 
-removing corrupted and duplicate files.
-'''
 def refill_categories(config, max_rounds=5):
     for round_idx in range(max_rounds):
         print(f"\n--- Round {round_idx+1}/{max_rounds} ---")
@@ -225,11 +203,6 @@ def refill_categories(config, max_rounds=5):
 
     print("\nStopped after max rounds. Some categories may still be short.")
 
-
-'''
-Scans each category and deletes any images that have identical content by comparing 
-MD5 hashes.
-'''
 def remove_duplicate_images(config: Config):
   if config.remove_duplicates:
       for category in config.categories:
@@ -244,11 +217,6 @@ def remove_duplicate_images(config: Config):
               else:
                   hashes[file_hash] = img_path
 
-
-'''
-Randomly selects up to 5 images per category and displays them in a row with their 
-filenames, and warning if no images are found.
-'''
 def display_images(config: Config):
   config.dataset_path = Path("datasets")
 
@@ -260,7 +228,7 @@ def display_images(config: Config):
           print(f"{category}: No images found!")
           continue
 
-      sample_images = random.sample(all_images, min(5, len(all_images)))
+      sample_images = random.sample(all_images, min(5, len(all_images))) # Display 5 random images per category.
 
       print(f"{category}:")
       plt.figure(figsize=(15, 3))
@@ -272,15 +240,9 @@ def display_images(config: Config):
           plt.title(f"{img_path.name}")
       plt.show()
 
-# global mapping: str(path) -> Checkbox widget
-checkboxes = {}
-
-
-'''
-Displays thumbnails of all images per category with checkboxes, allowing the user 
-to mark which images to keep or delete interactively.
-'''
+checkboxes = {}    # global mapping: str(path) -> Checkbox widget
 def select_img_for_deletion(config):
+   # Populate global checkboxes mapping with widgets for manual review.
     global checkboxes
     checkboxes.clear()
 
@@ -321,11 +283,6 @@ def select_img_for_deletion(config):
 
     print("\nUncheck images to delete, then run delete_unchecked_images().")
 
-
-'''
-Deletes all images whose checkboxes were unchecked in the UI, reporting successes and failures, 
-and optionally clears the display and checkbox mapping.
-'''
 def delete_unchecked_images(clear_ui: bool = True):
     global checkboxes
     if not checkboxes:
@@ -354,17 +311,84 @@ def delete_unchecked_images(clear_ui: bool = True):
         # Keep checkboxes empty to avoid accidental repeats
         checkboxes.clear()
 
-
-'''
-Verifies all images in the dataset and deletes any that are corrupted, reporting the number removed.
-'''
 def remove_corrupted_images(config: Config):
     failed = verify_images(get_image_files(config.dataset_path))
     failed.map(Path.unlink)
     print(f"Removed {len(failed)} corrupted images.")
 
+def create_dataloader(config: Config):
+    dls = DataBlock(
+        blocks=(ImageBlock, CategoryBlock),
+        get_items=get_image_files,
+        splitter=RandomSplitter(valid_pct=0.2, seed=42),
+        get_y=parent_label,
+        item_tfms=[Resize(192, method='squish')]
+    ).dataloaders(config.dataset_path, bs=4)
+    # dls.show_batch(max_n=12)
+    return dls
 
-# # ========================= DatasetManager class =========================
+def check_datasets(config: Config):
+    all_files = get_image_files(config.dataset_path)
+    print(f"Found {len(all_files)} image files.")
+    if len(all_files) == 0:
+        print("No image files found in {config.dataset_path}. Please ensure the dataset path and file structure are correct.")
+        return # Exit early if no files found
+
+    print(f"Example files: {all_files[:3]}")
+
+    dls = create_dataloader(config)
+
+    print(f"Length of training dataset: {len(dls.train_ds)}")
+    print(f"Length of validation dataset: {len(dls.valid_ds)}")
+
+    if len(dls.train_ds) == 0 and len(dls.valid_ds) == 0:
+        print("DataLoader created, but both training and validation datasets are empty.")
+        print("This might happen if the splitter or get_y function failed to assign labels or split items.")
+        return
+
+
+# ============ Run on Colab/Jupyter (interactive notebook control) ====================
+
+create_folders_for_categories(config)
+
+download_images(config)
+
+display_images(config)
+
+select_img_for_deletion(config)
+
+# Create dataloader
+dls = create_dataloader(config)
+
+# Check categories in validation set
+print("Categories in validation set:")
+valid_categories = [dls.vocab[item[1].item()] for item in dls.valid_ds]
+from collections import Counter
+print(Counter(valid_categories))
+
+# Build an image classification model (defined with pretrained weights)
+learn = vision_learner(dls, resnet18, metrics=error_rate)
+
+# delete_unchecked_images()
+
+# refill_categories(config)
+
+check_datasets(config)
+
+# Create dataloader
+dls = create_dataloader(config)
+
+# Build an image classification model (defined with pretrained weights)
+learn = vision_learner(dls, resnet18, metrics=error_rate)
+
+# Train the model for 10 epochs
+learn.fine_tune(10)
+
+# Confusion matrix
+interp = ClassificationInterpretation.from_learner(learn)
+interp.plot_confusion_matrix()
+
+# ========================= DatasetManager class =========================
 
 # class DatasetManager:
 #     def __init__(self, config: Config):
@@ -376,8 +400,9 @@ def remove_corrupted_images(config: Config):
 #         select_img_for_deletion(self.config)
 #         refill_categories(self.config)
 #         display_images(self.config)
+#         create_dataloader(self.config)
 
-# ========================= Main entry point - Single workflow =========================
+# ================ Main entry point - Single workflow =====================
 
 # def main():
 #     manager = DatasetManager(config)
@@ -385,15 +410,3 @@ def remove_corrupted_images(config: Config):
 
 # if __name__ == "__main__":
 #     main()
-
-
-'''
-For Colab (or Jupyter) it is better to split the code into cells for interactive notebook control.
-
-create_folders_for_categories(config)
-download_images(config)
-select_img_for_deletion(config)
-delete_unchecked_images()
-refill_categories(config)
-display_images(config)
-'''
