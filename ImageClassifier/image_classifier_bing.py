@@ -41,17 +41,17 @@ import uuid
 class Config:
     dataset_path: Path
     categories: List[str]
-    images_per_search: int = 5
-    images_per_category: int = 5
+    images_per_search: int = 10
+    images_per_category: int = 10
     sleep_time: int = 2
     remove_duplicates: bool = True
 
 # Config instance
 config = Config(
     dataset_path=Path("datasets"),
-    categories=["sky", "beach", "umbrella", "dog", "book"],
-    images_per_search = 5,
-    images_per_category = 5,
+    categories=["sky", "ocean", "umbrella", "dog", "book"],
+    images_per_search = 10,
+    images_per_category = 10,
     sleep_time = 2,
     remove_duplicates = True
 )
@@ -241,6 +241,7 @@ def display_images(config: Config):
       plt.show()
 
 checkboxes = {}    # global mapping: str(path) -> Checkbox widget
+
 def select_img_for_deletion(config):
    # Populate global checkboxes mapping with widgets for manual review.
     global checkboxes
@@ -284,6 +285,8 @@ def select_img_for_deletion(config):
     print("\nUncheck images to delete, then run delete_unchecked_images().")
 
 def delete_unchecked_images(clear_ui: bool = True):
+    # Delete images that have been unchecked in the UI.
+
     global checkboxes
     if not checkboxes:
         print("No checkboxes found.")
@@ -346,49 +349,7 @@ def check_datasets(config: Config):
         print("This might happen if the splitter or get_y function failed to assign labels or split items.")
         return
 
-
-# ============ Run on Colab/Jupyter (interactive notebook control) ====================
-
-create_folders_for_categories(config)
-
-download_images(config)
-
-display_images(config)
-
-select_img_for_deletion(config)
-
-# Create dataloader
-dls = create_dataloader(config)
-
-# Check categories in validation set
-print("Categories in validation set:")
-valid_categories = [dls.vocab[item[1].item()] for item in dls.valid_ds]
-from collections import Counter
-print(Counter(valid_categories))
-
-# Build an image classification model (defined with pretrained weights)
-learn = vision_learner(dls, resnet18, metrics=error_rate)
-
-# delete_unchecked_images()
-
-# refill_categories(config)
-
-check_datasets(config)
-
-# Create dataloader
-dls = create_dataloader(config)
-
-# Build an image classification model (defined with pretrained weights)
-learn = vision_learner(dls, resnet18, metrics=error_rate)
-
-# Train the model for 10 epochs
-learn.fine_tune(10)
-
-# Confusion matrix
-interp = ClassificationInterpretation.from_learner(learn)
-interp.plot_confusion_matrix()
-
-# ========================= DatasetManager class =========================
+# # ========================= DatasetManager class =========================
 
 # class DatasetManager:
 #     def __init__(self, config: Config):
@@ -402,7 +363,7 @@ interp.plot_confusion_matrix()
 #         display_images(self.config)
 #         create_dataloader(self.config)
 
-# ================ Main entry point - Single workflow =====================
+# ========================= Main entry point - Single workflow =========================
 
 # def main():
 #     manager = DatasetManager(config)
@@ -410,3 +371,38 @@ interp.plot_confusion_matrix()
 
 # if __name__ == "__main__":
 #     main()
+
+# ================================ Colab/Jupyter =======================================
+
+create_folders_for_categories(config)
+
+download_images(config)
+
+# display_images(config)
+
+# select_img_for_deletion(config)
+
+# delete_unchecked_images()
+
+# refill_categories(config)
+
+check_datasets(config)
+
+# Create dataloader
+dls = create_dataloader(config)
+
+# Check categories in validation set
+print("Categories in validation set:")
+valid_categories = [dls.vocab[item[1].item()] for item in dls.valid_ds]
+from collections import Counter
+print(Counter(valid_categories))
+
+# Build an image classification model (defined with pretrained weights)
+learn = vision_learner(dls, resnet18, metrics=error_rate)
+
+# Train the model for 10 epochs
+learn.fine_tune(10)
+
+# Confusion matrix
+interp = ClassificationInterpretation.from_learner(learn)
+interp.plot_confusion_matrix()
