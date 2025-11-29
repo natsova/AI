@@ -39,7 +39,6 @@ import uuid
 
 @dataclass
 class Config:
-    #dataset_path: Path
     dataset_path=Path("datasets")
     categories: List[str]
     images_per_search: int = 50
@@ -49,12 +48,7 @@ class Config:
 
 # Config instance
 config = Config(
-    #dataset_path=Path("datasets"),
-    categories=["sky", "ocean", "umbrella", "dog", "book"],
-    #images_per_search = 10,
-    #images_per_category = 10,
-    #sleep_time = 2,
-    #remove_duplicates = True
+    categories=["sky", "ocean", "umbrella", "dog", "book"]
 )
 
 def create_folders_for_categories(config: Config):
