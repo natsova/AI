@@ -39,21 +39,22 @@ import uuid
 
 @dataclass
 class Config:
-    dataset_path: Path
+    #dataset_path: Path
+    dataset_path=Path("datasets")
     categories: List[str]
-    images_per_search: int = 10
-    images_per_category: int = 10
+    images_per_search: int = 50
+    images_per_category: int = 150
     sleep_time: int = 2
     remove_duplicates: bool = True
 
 # Config instance
 config = Config(
-    dataset_path=Path("datasets"),
+    #dataset_path=Path("datasets"),
     categories=["sky", "ocean", "umbrella", "dog", "book"],
-    images_per_search = 10,
-    images_per_category = 10,
-    sleep_time = 2,
-    remove_duplicates = True
+    #images_per_search = 10,
+    #images_per_category = 10,
+    #sleep_time = 2,
+    #remove_duplicates = True
 )
 
 def create_folders_for_categories(config: Config):
@@ -349,36 +350,11 @@ def check_datasets(config: Config):
         print("This might happen if the splitter or get_y function failed to assign labels or split items.")
         return
 
-# # ========================= DatasetManager class =========================
-
-# class DatasetManager:
-#     def __init__(self, config: Config):
-#         self.config = config
-
-#     def setup(self):
-#         create_folders_for_categories(self.config)
-#         download_images(self.config)
-#         select_img_for_deletion(self.config)
-#         refill_categories(self.config)
-#         display_images(self.config)
-#         create_dataloader(self.config)
-
-# ========================= Main entry point - Single workflow =========================
-
-# def main():
-#     manager = DatasetManager(config)
-#     manager.setup()
-
-# if __name__ == "__main__":
-#     main()
-
-# ================================ Colab/Jupyter =======================================
-
 create_folders_for_categories(config)
 
 download_images(config)
 
-# display_images(config)
+display_images(config)
 
 # select_img_for_deletion(config)
 
@@ -406,3 +382,37 @@ learn.fine_tune(10)
 # Confusion matrix
 interp = ClassificationInterpretation.from_learner(learn)
 interp.plot_confusion_matrix()
+
+
+
+
+
+
+
+
+
+
+
+
+# # ========================= DatasetManager class =========================
+
+# class DatasetManager:
+#     def __init__(self, config: Config):
+#         self.config = config
+
+#     def setup(self):
+#         create_folders_for_categories(self.config)
+#         download_images(self.config)
+#         select_img_for_deletion(self.config)
+#         refill_categories(self.config)
+#         display_images(self.config)
+#         create_dataloader(self.config)
+
+# ========================= Main entry point - Single workflow =========================
+
+# def main():
+#     manager = DatasetManager(config)
+#     manager.setup()
+
+# if __name__ == "__main__":
+#     main()
