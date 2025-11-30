@@ -1,4 +1,4 @@
-## Deep Learning Model - Image Classifier (Kaggle version, basic)
+## Deep Learning Model - Image Classifier
 
 # Check for internet connectivity 
 import socket
@@ -19,7 +19,6 @@ if iskaggle:
 !pip install bing-image-downloader --quiet
 !pip install ipywidgets --quiet
 !pip install pillow --quiet
-
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 from pathlib import Path
@@ -46,6 +45,14 @@ import shutil
 import time
 from icrawler.builtin import BingImageCrawler
 from fastai.vision.all import PILImage
+from io import BytesIO
+import requests
+
+dataset_path = Path("datasets")
+category = ["sky", "ocean", "umbrella", "dog", "book"]
+images_per_category = 15  # total images per category
+images_per_query = 10     # images to try per query
+resize_to = (400, 400)
 
 def create_folders_for_categories():
     if dataset_path.exists() and dataset_path.is_dir(): # Clear existing dataset
@@ -60,14 +67,8 @@ def create_folders_for_categories():
 
 create_folders_for_categories()
 
-dataset_path = Path("datasets")
-categories = ["sky", "ocean", "umbrella", "dog", "book"]
-images_per_category = 15  # total images per category
-images_per_query = 10     # images to try per query
-resize_to = (400, 400)
-
 def download_images_for_categories():
-    for c in categories:
+    for c in category:
         category_path = dataset_path / c
         category_path.mkdir(parents=True, exist_ok=True)
 
@@ -146,6 +147,7 @@ interp = ClassificationInterpretation.from_learner(learn)
 interp.plot_confusion_matrix()
 
 # # Apply trained model
+
 # Process the image through the same training pipeline
 url = "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fcontent.lyka.com.au%2Ff%2F1016262%2F4288x2848%2F6fef92978a%2Fspoodle-puppy.jpeg%2Fm%2F1280x0%2Ffilters%3Aformat(webp)&f=1&nofb=1&ipt=aff6f2e8af6a16d4ca4e06da3fb681d12344283830ffd571b25039e60182e01c"
 test_image = PILImage.create(BytesIO(requests.get(url).content))
