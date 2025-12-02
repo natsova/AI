@@ -1,3 +1,9 @@
+# core/model_manager.py
+
+from fastai.vision.all import vision_learner, resnet18, PILImage
+import requests
+from io import BytesIO
+
 class ModelManager:
     def __init__(self, dls, arch=resnet18, metrics=error_rate):
         self.dls = dls
