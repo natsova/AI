@@ -16,9 +16,6 @@ from dataclasses import dataclass
 from fastai.vision.all import verify_images, get_image_files
 from bing_image_downloader import downloader
 
-import ipywidgets as widgets
-from IPython.display import display, clear_output
-
 from core.config import Config   # FIX: must import Config
 
 from core.review_tools import select_img_for_deletion, delete_unchecked_images
@@ -28,6 +25,13 @@ class DatasetManager:
     def __init__(self, config: Config):
         self.config = config
 
+    def prepare_full_dataset(self):
+        self.create_folders()
+        self.download_images()
+        self.select_img_for_deletion(self.config)
+        self.refill_categories()
+        self.display_images()
+        
     # ---------------------------------------------------------
     # Folder creation
     # ---------------------------------------------------------
@@ -47,7 +51,7 @@ class DatasetManager:
     # ---------------------------------------------------------
     # Main dataset download
     # ---------------------------------------------------------
-    def download_all(self):
+    def download_images(self):
         for category in self.config.categories:
             print(f"\nProcessing category: {category}")
             image_counter = 1
@@ -141,7 +145,7 @@ class DatasetManager:
     # ---------------------------------------------------------
     # Refill incomplete categories
     # ---------------------------------------------------------
-    def refill(self, max_rounds=5):
+    def refill_categories(self, max_rounds=5):
         for round_idx in range(max_rounds):
             print(f"\n--- Round {round_idx+1}/{max_rounds} ---")
             categories_filled = True
@@ -204,7 +208,7 @@ class DatasetManager:
     # ---------------------------------------------------------
     # Display sample images
     # ---------------------------------------------------------
-    def display_samples(self):
+    def display_images(self):
         for category in self.config.categories:
             category_path = self.config.dataset_path / category
             all_images = list(category_path.glob("*.jpg"))
