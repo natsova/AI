@@ -21,6 +21,8 @@ from IPython.display import display, clear_output
 
 from core.config import Config   # FIX: must import Config
 
+from core.review_tools import select_img_for_deletion, delete_unchecked_images
+
 
 class DatasetManager:
     def __init__(self, config: Config):
