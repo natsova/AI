@@ -377,11 +377,22 @@ learn.fine_tune(10)
 interp = ClassificationInterpretation.from_learner(learn)
 interp.plot_confusion_matrix()
 
+# Apply model
 
+# Process an image through the same training pipeline
+url = "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fcontent.lyka.com.au%2Ff%2F1016262%2F4288x2848%2F6fef92978a%2Fspoodle-puppy.jpeg%2Fm%2F1280x0%2Ffilters%3Aformat(webp)&f=1&nofb=1&ipt=aff6f2e8af6a16d4ca4e06da3fb681d12344283830ffd571b25039e60182e01c"
+im = PILImage.create(BytesIO(requests.get(url).content))
 
+# Use the trained model to predict the class of the new image and display probabilities for all classes
+categories = list(learn.dls.vocab)
 
+def predict_image(im):
+    predicted_class, _, probs = learn.predict(im)
+    print(f"This is a: {predicted_class}.")
+    for idx, ele in enumerate(categories):
+        print(f"Probability it's a {ele}: {probs[idx]:.4f}")
 
-
+predict_image(im)
 
 
 
