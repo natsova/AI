@@ -1,3 +1,13 @@
+# core/dataset_manager.py
+
+from pathlib import Path
+import os
+import shutil
+from PIL import Image
+import hashlib
+from fastai.vision.all import verify_images, get_image_files
+from dataclasses import dataclass
+
 class DatasetManager:
     def __init__(self, config: Config):
         self.config = config
