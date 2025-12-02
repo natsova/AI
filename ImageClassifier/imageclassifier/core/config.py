@@ -6,7 +6,7 @@ from typing import List
 
 @dataclass
 class Config:
-    dataset_path=Path("datasets")
+    dataset_path: Path = Path("datasets") 
     categories: List[str]
     images_per_search: int = 50
     images_per_category: int = 150
